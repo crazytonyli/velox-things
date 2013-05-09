@@ -2,6 +2,8 @@
 #import <SpringBoard/SpringBoard.h>
 #include <sqlite3.h>
 
+#define TASK_CELL_HEIGHT 44.f
+
 @interface ThingsTask : NSObject
 @property (nonatomic, retain) NSString *uuid;
 @property (nonatomic, retain) NSString *title;
@@ -55,7 +57,10 @@ static int task_callback(void *param, int argc, char **argv, char **column){
             [label release];
         } else {
             _sepImage = [[UIImage imageNamed:@"BulletinListCellSeparator"] retain];
-        
+
+            aFrame.size.height = MIN([_tasks count], 3u) * TASK_CELL_HEIGHT;
+            self.frame = aFrame;
+            
             UITableView *table = [[UITableView alloc] initWithFrame:self.bounds style:UITableViewStylePlain];
             table.backgroundColor = [UIColor clearColor];
             table.backgroundView = nil;
@@ -79,10 +84,8 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 - (NSArray *)tasks {
     NSMutableArray *tasks = [NSMutableArray array];
     
-    NSString *dbPath = [[[[[[NSClassFromString(@"SBApplicationController") sharedInstance] applicationsWithBundleIdentifier:@"com.culturedcode.ThingsTouch"] lastObject] path] stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Documents/Things.sqlite3"];
-    NSLog(@"Database path: %@", dbPath);
-    
     sqlite3 *db;
+    NSString *dbPath = [[[[[[NSClassFromString(@"SBApplicationController") sharedInstance] applicationsWithBundleIdentifier:@"com.culturedcode.ThingsTouch"] lastObject] path] stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Documents/Things.sqlite3"];
     int err = sqlite3_open([dbPath UTF8String], &db);
     if (err) {
         NSLog(@"failed to open db, err: %d, path: %@", err, dbPath);
@@ -124,7 +127,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[NSString stringWithFormat:@"things://task/%@", [[self taskAtIndexPath:indexPath] uuid]]]];
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[NSString stringWithFormat:@"things:task?uuid=%@", [[self taskAtIndexPath:indexPath] uuid]]]];
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
@@ -162,8 +165,9 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 +(int)folderHeight{
-	return 88; //Make folder bigger on i5 devices?
+	return TASK_CELL_HEIGHT;
 }
+
 @end
 
 @implementation ThingsTask
