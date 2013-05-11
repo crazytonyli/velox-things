@@ -1,9 +1,9 @@
 Package: li.crazytony.veloxthings
 Name: Things for Velox
 Depends: firmware (>= 6.0), com.apextweaks.velox
-Version: 0.0.1
+Version: 0.2
 Architecture: iphoneos-arm
-Description: Things for Velox!
+Description: Shows `Today` tasks from Things app.
 Maintainer: Tony Li <crazygemini.lee@gmail.com>
 Author: Tony Li <crazygemini.lee@gmail.com>
 Section: Addons (Velox)

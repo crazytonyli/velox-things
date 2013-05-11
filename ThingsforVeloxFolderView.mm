@@ -29,6 +29,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 @interface ThingsforVeloxFolderView : UIView <VeloxFolderViewProtocol, UITableViewDelegate, UITableViewDataSource> {
+    NSString *_thingsAppDirectory;
     NSArray *_tasks;
     UIImage *_sepImage;
 }
@@ -42,40 +43,27 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 - (UIView *)initWithFrame:(CGRect)aFrame{
 	self = [super initWithFrame:aFrame];
     if (self){
+        _thingsAppDirectory = [[[[[[NSClassFromString(@"SBApplicationController") sharedInstance] applicationsWithBundleIdentifier:@"com.culturedcode.ThingsTouch"] lastObject] path] stringByDeletingLastPathComponent] retain];
+        NSLog(@"Things app directory: %@", _thingsAppDirectory);
         _tasks = [[self tasks] retain];
-        if (_tasks == nil) {
-            UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0,0,0,0)];
-            label.font = [UIFont boldSystemFontOfSize:16.f];
-            label.textColor = [UIColor whiteColor];
-            label.backgroundColor = [UIColor clearColor];
-            label.text = @"Hola! Nothing to do for today!";
-            CGRect frame;
-            frame.size = [label sizeThatFits:aFrame.size];
-            frame.origin = CGPointMake(roundf((aFrame.size.width - frame.size.width) / 2), roundf((aFrame.size.height - frame.size.height) / 2));
-            label.frame = frame;
-            [self addSubview:label];
-            [label release];
-        } else {
-            _sepImage = [[UIImage imageNamed:@"BulletinListCellSeparator"] retain];
 
-            aFrame.size.height = MIN([_tasks count], 3u) * TASK_CELL_HEIGHT;
-            self.frame = aFrame;
-            
-            UITableView *table = [[UITableView alloc] initWithFrame:self.bounds style:UITableViewStylePlain];
-            table.backgroundColor = [UIColor clearColor];
-            table.backgroundView = nil;
-            table.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
-            table.separatorStyle = UITableViewCellSeparatorStyleNone;
-            table.dataSource = self;
-            table.delegate = self;
-            [self addSubview:table];
-            [table release];
-        }
+        _sepImage = [[UIImage imageNamed:@"BulletinListCellSeparator"] retain];
+
+        UITableView *table = [[UITableView alloc] initWithFrame:self.bounds style:UITableViewStylePlain];
+        table.backgroundColor = [UIColor clearColor];
+        table.backgroundView = nil;
+        table.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
+        table.separatorStyle = UITableViewCellSeparatorStyleNone;
+        table.dataSource = self;
+        table.delegate = self;
+        [self addSubview:table];
+        [table release];
 	}
     return self;
 }
 
 - (void)dealloc {
+    [_thingsAppDirectory release];
     [_tasks release];
     [_sepImage release];
     [super dealloc];
@@ -85,23 +73,16 @@ static int task_callback(void *param, int argc, char **argv, char **column){
     NSMutableArray *tasks = [NSMutableArray array];
     
     sqlite3 *db;
-    NSString *dbPath = [[[[[[NSClassFromString(@"SBApplicationController") sharedInstance] applicationsWithBundleIdentifier:@"com.culturedcode.ThingsTouch"] lastObject] path] stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Documents/Things.sqlite3"];
+    NSString *dbPath = [_thingsAppDirectory stringByAppendingPathComponent:@"Documents/Things.sqlite3"];
     int err = sqlite3_open([dbPath UTF8String], &db);
     if (err) {
         NSLog(@"failed to open db, err: %d, path: %@", err, dbPath);
     } else {
-        // SQL: SELECT uuid, title FROM TMTask WHERE startDate NOT NULL AND startDate < 1368082107 AND status == 0 AND type == 0 ORDER BY userModificationDate DESC;
-        char sql[300];
-        if (sprintf(sql, "SELECT uuid, title FROM TMTask WHERE startDate NOT NULL AND startDate < %.2f AND status == 0 AND type == 0 ORDER BY userModificationDate DESC", [[NSDate date] timeIntervalSince1970]) > 0) {
-            NSLog(@"SQL: %s", sql);
-            char *emsg = NULL;
-            err = sqlite3_exec(db, sql, task_callback, tasks, &emsg);
-            if (err != SQLITE_OK) {
-                NSLog(@"SQL error: %s", emsg);
-                sqlite3_free(emsg);
-            }
-        } else {
-            NSLog(@"failed to format sql");
+        char *emsg = NULL;
+        err = sqlite3_exec(db, "SELECT uuid, title FROM TMTask WHERE startDate NOT NULL AND startDate NOT NULL AND stopDate IS NULL ORDER BY userModificationDate DESC", task_callback, tasks, &emsg);
+        if (err != SQLITE_OK) {
+            NSLog(@"SQL error: %s", emsg);
+            sqlite3_free(emsg);
         }
     }
     
@@ -115,7 +96,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return [_tasks count] * 2;
+    return ([_tasks count] == 0 ? 1 : [_tasks count]) * 2;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -127,26 +108,65 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:[NSString stringWithFormat:@"things:task?uuid=%@", [[self taskAtIndexPath:indexPath] uuid]]]];
+    // TODO open Things app to display selected tasks.
+    /*
+    NSString *uuid = [[self taskAtIndexPath:indexPath] uuid];
+    if (uuid == nil) {
+        return ;
+    }
+
+    NSString *appStateFilePath = [_thingsAppDirectory stringByAppendingPathComponent:@"Documents/AppState.plist"];
+    NSMutableDictionary *appState = [NSMutableDictionary dictionaryWithContentsOfFile:appStateFilePath];
+    [[appState objectForKey:@"SourcesControllerState"] removeObjectForKey:@"SelectedPath"];
+    NSMutableArray *controllers = [NSMutableArray array];
+    [controllers addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+        uuid, @"SelectedTask", @"TodayList", @"ListClass", [NSNumber numberWithInt:2],
+        @"State", @"TasksViewController", @"Class", nil]];
+    [controllers addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+        [NSNumber numberWithBool:NO], @"Editing", uuid, @"Task", @"TaskDetailViewController", @"Class", nil]];
+    [appState setObject:controllers forKey:@"AppStateViewControllers"];
+    [appState writeToFile:appStateFilePath atomically:YES];
+
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"things:task"]];
+    */
+
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = nil;
     if (indexPath.row % 2 == 0) {
-        static NSString *CID = @"cell";
-        cell = [tableView dequeueReusableCellWithIdentifier:CID];
-        if (cell == nil) {
-            cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"DefaultCell"] autorelease];
-            cell.backgroundColor = [UIColor clearColor];
-            cell.contentView.backgroundColor = [UIColor clearColor];
-            cell.imageView.image = [UIImage imageNamed:@"BulletinListUnreadAccessory"];
-            cell.selectedBackgroundView = [[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"BulletinListCellSelection"]] autorelease];
-            cell.textLabel.backgroundColor = [UIColor clearColor];
-            cell.textLabel.font = [UIFont boldSystemFontOfSize:16.f];
-            cell.textLabel.textColor = [UIColor whiteColor];
+        if ([_tasks count] > 0) {
+            static NSString *CID = @"cell";
+            cell = [tableView dequeueReusableCellWithIdentifier:CID];
+            if (cell == nil) {
+                cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"DefaultCell"] autorelease];
+                cell.backgroundColor = [UIColor clearColor];
+                cell.contentView.backgroundColor = [UIColor clearColor];
+                cell.imageView.image = [UIImage imageNamed:@"BulletinListUnreadAccessory"];
+                cell.selectedBackgroundView = [[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"BulletinListCellSelection"]] autorelease];
+                cell.textLabel.backgroundColor = [UIColor clearColor];
+                cell.textLabel.font = [UIFont boldSystemFontOfSize:16.f];
+                cell.textLabel.textColor = [UIColor whiteColor];
+            }
+            cell.textLabel.text = [self taskAtIndexPath:indexPath].title;
+        } else {
+            static NSString *CID = @"emptycell";
+            cell = [tableView dequeueReusableCellWithIdentifier:CID];
+            if (cell == nil) {
+                cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"DefaultCell"] autorelease];
+                cell.backgroundColor = [UIColor clearColor];
+                cell.contentView.backgroundColor = [UIColor clearColor];
+                cell.selectedBackgroundView = [[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"BulletinListCellSelection"]] autorelease];
+                cell.textLabel.backgroundColor = [UIColor clearColor];
+                cell.textLabel.font = [UIFont boldSystemFontOfSize:16.f];
+                cell.textLabel.textColor = [UIColor whiteColor];
+                cell.textLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                cell.textLabel.textAlignment = NSTextAlignmentCenter;
+            }
+            cell.textLabel.text = @"Nothing to do for today";
         }
-        cell.textLabel.text = [self taskAtIndexPath:indexPath].title;
+        
     } else {
         static NSString *CID = @"sepcell";
         cell = [tableView dequeueReusableCellWithIdentifier:CID];
@@ -165,7 +185,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 +(int)folderHeight{
-	return TASK_CELL_HEIGHT;
+	return TASK_CELL_HEIGHT * 4;
 }
 
 @end
@@ -179,6 +199,10 @@ static int task_callback(void *param, int argc, char **argv, char **column){
     [title release];
     [notes release];
     [super dealloc];
+}
+
+- (NSString *)description {
+    return [NSString stringWithFormat:@"%@:%@", uuid, title];
 }
 
 @end

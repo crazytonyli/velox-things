@@ -1,5 +1,6 @@
-THEOS = $(HOME)/Software/theos
-THEOS_DEVICE_IP = 10.1.192.200
+#THEOS = $(HOME)/Software/theos
+THEOS = /opt/theos
+THEOS_DEVICE_IP = 192.168.1.202
 
 include $(THEOS)/makefiles/common.mk
 
