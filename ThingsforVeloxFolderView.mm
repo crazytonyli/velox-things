@@ -79,7 +79,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
         NSLog(@"failed to open db, err: %d, path: %@", err, dbPath);
     } else {
         char *emsg = NULL;
-        err = sqlite3_exec(db, "SELECT uuid, title FROM TMTask WHERE startDate NOT NULL AND startDate NOT NULL AND stopDate IS NULL ORDER BY userModificationDate DESC", task_callback, tasks, &emsg);
+        err = sqlite3_exec(db, "SELECT uuid, title FROM TMTask WHERE startDate NOT NULL AND startDate NOT NULL AND stopDate IS NULL AND trashed == 0 AND start == 1 ORDER BY userModificationDate DESC", task_callback, tasks, &emsg);
         if (err != SQLITE_OK) {
             NSLog(@"SQL error: %s", emsg);
             sqlite3_free(emsg);
@@ -126,9 +126,9 @@ static int task_callback(void *param, int argc, char **argv, char **column){
         [NSNumber numberWithBool:NO], @"Editing", uuid, @"Task", @"TaskDetailViewController", @"Class", nil]];
     [appState setObject:controllers forKey:@"AppStateViewControllers"];
     [appState writeToFile:appStateFilePath atomically:YES];
+    */
 
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"things:task"]];
-    */
 
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
