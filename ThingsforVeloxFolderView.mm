@@ -104,7 +104,7 @@ static int task_callback(void *param, int argc, char **argv, char **column){
 }
 
 - (NSIndexPath *)tableView:(UITableView *)tableView willSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    return indexPath.row % 2 == 0 ? indexPath : nil;
+    return [_tasks count] == 0 ? nil : (indexPath.row % 2 == 0 ? indexPath : nil);
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
